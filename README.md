@@ -49,7 +49,8 @@ and send emails back the client if payment either `failed` or `succeeded`.
 
 ## Solutions Architecture
 
-/Users/rosius/Documents/ed-cdk-app/images/eda_cdk.png
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/eda_cdk.png)
+
 
 
 

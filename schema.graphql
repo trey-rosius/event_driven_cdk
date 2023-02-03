@@ -1,0 +1,39 @@
+
+type Schema {
+    query: Query
+    mutation: Mutation
+}
+
+type Order {
+
+    name: String!
+    quantity: Int!
+    restaurantId: String!
+
+}
+
+input OrderInput {
+
+    name: String!
+    quantity: Int!
+    restaurantId: String!
+}
+
+input UpdateOrderInput {
+
+    id: String!
+    name: String!
+    quantity: Int!
+    restaurantId: String!
+}
+
+type Query {
+  orders: [ Order ]!
+  order(id: String!): Order!
+}
+
+type Mutation {
+    postOrder(input: OrderInput!): Order!
+    updateOrder(input: UpdateOrderInput!): Order!
+    deleteOrder(id: String!): String
+}

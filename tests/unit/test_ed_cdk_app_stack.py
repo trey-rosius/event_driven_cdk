@@ -1,10 +1,10 @@
 import aws_cdk as core
 import aws_cdk.assertions as assertions
 
-from ed_cdk_app.ed_cdk_app_stack import EdCdkAppStack
+from event_driven_cdk_app.event_driven_cdk_app_stack import EdCdkAppStack
 
 # example tests. To run these tests, uncomment this file along with the example
-# resource in ed_cdk_app/ed_cdk_app_stack.py
+# resource in event_driven_cdk_app/event_driven_cdk_app_stack.py
 def test_sqs_queue_created():
     app = core.App()
     stack = EdCdkAppStack(app, "ed-cdk-app")

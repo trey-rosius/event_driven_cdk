@@ -51,30 +51,30 @@ While at it, we'll create more graphql endpoints, using direct lambda resolvers,
 
 ### AWS Services used
 
-#### AWS AppSync
+#### [AWS AppSync](https://aws.amazon.com/appsync/)
 AWS AppSync is a fully managed service allowing developers to deploy scalable and engaging real-time GraphQL backends on AWS.
 It leverages WebSockets connections under the hood to provide real time capabilities, by publishing data updates to connected
 subscribers.
 
-#### Amazon SQS(Simple Queue Service)
+#### [Amazon SQS](https://aws.amazon.com/sqs/)
 A fully managed message queueing service to decouple producers and consumers.SQS is a fundamental building block for building decoupled architectures
 
 #### AWS Lambda
 AWS Lambda is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers.
 You can trigger Lambda from over 200 AWS services and software as a service (SaaS) applications, and only pay for what you use.
 
-#### AWS StepFunctions
+#### [AWS StepFunctions](https://aws.amazon.com/step-functions/)
 AWS Step Functions is a visual workflow service that helps developers use AWS services to build distributed applications,
 automate processes, orchestrate microservices, and create data and machine learning (ML) pipelines.
 
-#### AWS SNS
+#### [AWS SNS](https://aws.amazon.com/sns/)
 Amazon Simple Notification Service (SNS) sends notifications two ways, A2A and A2P. A2A provides high-throughput, push-based, many-to-many messaging between distributed systems,
 microservices, and event-driven serverless applications. These applications include Amazon Simple Queue Service (SQS), Amazon Kinesis Data Firehose, AWS Lambda, and other HTTPS endpoints.
 A2P functionality lets you send messages to your customers with SMS texts, push notifications, and email.
 
 For this application, we'll be using A2P.
 
-#### Amazon DynamoDB
+#### [Amazon DynamoDB](https://aws.amazon.com/dynamodb/)
 Amazon DynamoDB is a fully managed, serverless, key-value NoSQL database designed to run high-performance applications at any scale.
 DynamoDB offers built-in security, continuous backups, automated multi-Region replication, in-memory caching, and data import and export tools.
 
@@ -103,66 +103,50 @@ both of them.
 When a Lambda function subscribes to an SQS queue, Lambda polls the queue as it waits for messages to arrive.
 Lambda consumes messages in batches, starting at five concurrent batches with five functions at a time.
 If there are more messages in the queue, Lambda adds up to 60 functions per minute, up to 1,000 functions, to consume those messages. 
-This means that Lambda can scale up to 1,000 concurrent Lambda functions processing messages from the SQS queue
+This means that Lambda can scale up to 1,000 concurrent Lambda functions processing messages from the SQS queue.
 
 ![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/sqs-lambda.png)
 
+Failed messages are sent back into the queue, to be retried by lambda. A DLQ(Dead letter queue) is put in place 
+to prevent failed messages from getting added to the queue multiple times. 
+Once in DLQ, these messages can be reassessed and resent to the lambda for processing by humans.
+
+Once lambda successfully processes a message, it extracts the order payload and invokes a step functions workflow with the payload 
+as the input request.
+We use step functions to orchestrate the payment process. No real api's are being called. All we do is mimic a real life scenario. 
+
+Inside the step functions, we randomly determine if an order was paid or not,save the order in dynamoDB and then send `success` or `failure` 
+emails using SNS to the client who made the order.
+
+We also create endpoints to `get_order`, `update-order` and `delete-order`.
+
+Enough talk. Let's see some code.
+
+## Prerequisite
+Before proceeding, please confirm you have all these dependencies installed on your computer
+
+- [AWS CLI](https://aws.amazon.com/cli/)
+- [AWS CDK](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html)
 
 
+### Creating a new cdk python project
+From the command line interface(Terminal), create and change directory into the newly created folder using the command
 
+`mkdir eventDrivenCdk && cd $_`
 
+I named my project `eventDrivenCdk`, feel free to give yours a different name.
 
+Within the newly created project,initialize a python cdk project using the command
 
+cdk init --language=python
 
+This project is set up like a standard Python project.  The initialization process also creates a virtualenv 
+within this project, stored under the `.venv` directory. 
 
+To create the virtualenv it assumes that there is a `python3` (or `python` for Windows) 
+executable in your path with access to the `venv`package. 
 
-
-
-All serverless applications are event driven. One service triggers another service, which intern fires off a response.
-
-If you've been in the software world for a while now, which I assume you have, then you've definitely come across the term `coupling` 
-numerous times. 
-
-In order to build truly distributed applications, you must make sure your application components aren't tightly coupled. 
-D.I
-
-Decouple your application, and then use events and messages to communicate with the various
-decoupled parts. That's all. 
-This 
-
-In this blog post, we'll look at how to build a modern GraphQL Serverless API using the concept of EDA. 
-
-
-#### Disclaimer
-This application is in no way ready for production purposes.It's only a proof of concept.So please don't forget to destroy all created
-resources, once you are done playing with.
-
-
-
-
-
-
-## Event Driven Architectures (EDA)
-
-If you've ever built a serverless application, then you've built an event driven application. In simple terms, an EDA is an application 
-which emits events, in response to a request. It's now left onto other parts of the application to react to those events.
-
-
-
-
-
-# Welcome to your CDK Python project!
-
-This is a blank project for CDK development with Python.
-
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
-
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
+If for any reason the automatic creation of the virtualenv fails, you can create the virtualenv manually.
 
 To manually create a virtualenv on MacOS and Linux:
 
@@ -185,15 +169,32 @@ If you are a Windows platform, you would activate the virtualenv like this:
 
 Once the virtualenv is activated, you can install the required dependencies.
 
+Add `boto3` to the `requirements.txt` before running the command.
+
 ```
 $ pip install -r requirements.txt
 ```
 
-At this point you can now synthesize the CloudFormation template for this code.
+Boto3 is the aws sdk for python.
 
-```
-$ cdk synth
-```
+
+
+
+
+
+
+
+
+
+
+## Rererences
+- https://aws.amazon.com/blogs/compute/introducing-maximum-concurrency-of-aws-lambda-functions-when-using-amazon-sqs-as-an-event-source/
+- https://aws.amazon.com/blogs/compute/understanding-how-aws-lambda-scales-when-subscribed-to-amazon-sqs-queues/
+- 
+
+
+
+
 
 To add additional dependencies, for example other CDK libraries, just add
 them to your `setup.py` file and rerun the `pip install -r requirements.txt`

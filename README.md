@@ -41,16 +41,71 @@ This way, you’re not paying for continuous polling to check for an event.
 
 Now that we have a brief understanding of what EDA's are, let's go ahead and dive into the main topic for the blog post.
 
-We'll use the concept of EDA's to design and build a modern serverless api.
+We'll use the concept of EDA's to design and build a modern serverless graphql api.
 
 ## Use Case
-We'll simulate a scenario whereby, a restaurant receives orders from clients, processes those orders with client payments 
-and send emails back the client if payment either `failed` or `succeeded`.
+We'll simulate a scenario whereby, a restaurant receives orders from clients through a graphql endpoint, processes those orders with client payments 
+and send emails back to the client if payment either `failed` or `succeeded`.
 
-## Solutions Architecture
+While at it, we'll create more graphql endpoints, using direct lambda resolvers, in order to mimic a semi real life scenario.
+
+### AWS Services used
+
+#### AWS AppSync
+AWS AppSync is a fully managed service allowing developers to deploy scalable and engaging real-time GraphQL backends on AWS.
+It leverages WebSockets connections under the hood to provide real time capabilities, by publishing data updates to connected
+subscribers.
+
+#### Amazon SQS(Simple Queue Service)
+A fully managed message queueing service to decouple producers and consumers.SQS is a fundamental building block for building decoupled architectures
+
+#### AWS Lambda
+AWS Lambda is a serverless, event-driven compute service that lets you run code for virtually any type of application or backend service without provisioning or managing servers.
+You can trigger Lambda from over 200 AWS services and software as a service (SaaS) applications, and only pay for what you use.
+
+#### AWS StepFunctions
+AWS Step Functions is a visual workflow service that helps developers use AWS services to build distributed applications,
+automate processes, orchestrate microservices, and create data and machine learning (ML) pipelines.
+
+#### AWS SNS
+Amazon Simple Notification Service (SNS) sends notifications two ways, A2A and A2P. A2A provides high-throughput, push-based, many-to-many messaging between distributed systems,
+microservices, and event-driven serverless applications. These applications include Amazon Simple Queue Service (SQS), Amazon Kinesis Data Firehose, AWS Lambda, and other HTTPS endpoints.
+A2P functionality lets you send messages to your customers with SMS texts, push notifications, and email.
+
+For this application, we'll be using A2P.
+
+#### Amazon DynamoDB
+Amazon DynamoDB is a fully managed, serverless, key-value NoSQL database designed to run high-performance applications at any scale.
+DynamoDB offers built-in security, continuous backups, automated multi-Region replication, in-memory caching, and data import and export tools.
+
+
+#### Solutions Architecture
+
 
 ![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/eda_cdk.png)
 
+From the architecture above, the amplify icon signifies a frontend application.It can be a mobile or web app. So a client places
+an order for 5 cartoons of pizza from Dominos pizza.
+
+Here's the request payload 
+```json
+"name": "Pizza",
+"quantity": 6,
+"restaurantId": "Dominos 
+```
+AppSync receives the request and sends a message, containing the payload to an attached SQS queue. As we mentioned before, we
+use SQS to decouple the event producers(appsync) from the consumers(in this case a Lambda), so that they can communicate asynchronously.
+
+So as order requests keep flooding in, let's say on a world pizza day when demand is really high,all requests are being sent to SQS.
+Lambda is a common choice as a consumer for SQS as it supports native integration.So you get to write and maintain less code between 
+both of them.
+
+When a Lambda function subscribes to an SQS queue, Lambda polls the queue as it waits for messages to arrive.
+Lambda consumes messages in batches, starting at five concurrent batches with five functions at a time.
+If there are more messages in the queue, Lambda adds up to 60 functions per minute, up to 1,000 functions, to consume those messages. 
+This means that Lambda can scale up to 1,000 concurrent Lambda functions processing messages from the SQS queue
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/sqs-lambda.png)
 
 
 

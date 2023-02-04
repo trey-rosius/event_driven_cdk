@@ -177,6 +177,15 @@ $ pip install -r requirements.txt
 
 Boto3 is the aws sdk for python.
 
+### Defining Stack Resources
+
+We are going to be using one stack to define all the resources our application needs.
+
+Let's start by defining `iam roles` and `managed policies`.
+
+Please open up your stack file, mine is `event_driven_cdk_app_stack.py`.
+
+
 
 
 

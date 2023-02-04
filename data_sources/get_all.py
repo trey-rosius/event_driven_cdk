@@ -4,6 +4,7 @@ import aws_cdk.aws_appsync as appsync
 
 def create_data_source(stack, api, schema, db_role, lambda_execution_role):
     with open("lambda_fns/get_orders/get_orders.py", 'r') as file:
+
         getAll_function = file.read()
 
     getAllDs_function = lambda_.CfnFunction(stack, "gets",

@@ -122,6 +122,9 @@ We also create endpoints to `get_order`, `update-order` and `delete-order`.
 
 Enough talk. Let's see some code.
 
+🚨Note: We would be looking at code snippets and not the complete source code for the application. For the complete code, please 
+visit the GitHub page at [Event Driven CDK](https://github.com/trey-rosius/event_driven_cdk)
+
 ## Prerequisite
 Before proceeding, please confirm you have all these dependencies installed on your computer
 
@@ -177,13 +180,221 @@ $ pip install -r requirements.txt
 
 Boto3 is the aws sdk for python.
 
-### Defining Stack Resources
+### Graphql Schema
+In the root directory, create a file called `schema.graphql` and type in the following code.
+This file is a description of our graphql api. It contains all the types, queries, mutations, subscriptions, etc for our 
+graphql api.
 
-We are going to be using one stack to define all the resources our application needs.
+```graphql
 
-Let's start by defining `iam roles` and `managed policies`.
+type Schema {
+    query: Query
+    mutation: Mutation
+}
 
-Please open up your stack file, mine is `event_driven_cdk_app_stack.py`.
+type Order {
+
+    name: String!
+    quantity: Int!
+    restaurantId: String!
+
+}
+
+input OrderInput {
+
+    name: String!
+    quantity: Int!
+    restaurantId: String!
+}
+
+input UpdateOrderInput {
+
+    id: String!
+    name: String!
+    quantity: Int!
+    restaurantId: String!
+}
+
+type Query {
+  orders: [ Order ]!
+  order(id: String!): Order!
+}
+
+type Mutation {
+    postOrder(input: OrderInput!): Order!
+    updateOrder(input: UpdateOrderInput!): Order!
+    deleteOrder(id: String!): String
+}
+
+
+```
+From the schema, our api has  3 mutations and 2 queries.
+Before delving into the implementation details of these endpoints, we need to first define all the resources the app needs
+in order to run effectively.
+
+### Defining the Graphql API in Stack
+The first step is to import the `appsync` class from the `aws-cdk-lib`.
+`import aws_cdk.aws_appsync as appsync`
+
+Then, use `CfnGraphQLApi` method within the appsync class to create the api. This method takes a myriad of parameters, 
+but for our use case, all we need is an api name, the authentication type, xray and cloud watch for tracing and logging. 
+
+
+```python
+        api = appsync.CfnGraphQLApi(self, "Api",
+                                    name="event_driven_cdk",
+                                    authentication_type="API_KEY",
+                                    xray_enabled=True,
+                                    log_config=log_config
+                                    )
+   log_config = appsync.CfnGraphQLApi.LogConfigProperty(
+            cloud_watch_logs_role_arn=appsync_cloud_watch_role.role_arn,
+            exclude_verbose_content=False,
+            field_log_level="ALL")
+
+```
+This line `cloud_watch_logs_role_arn=appsync_cloud_watch_role.role_arn,` gives appsync permissions to push logs to cloudwatch. 
+Here's how we define the role and attach its policies.
+
+```python
+  cloud_watch_role_full_access = iam.ManagedPolicy.from_managed_policy_arn(self, "cloudWatchLogRole",
+                                                                                 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess')
+       
+ appsync_cloud_watch_role = iam.Role(self, "AppSyncCloudWatchRole",
+                                            assumed_by=iam.ServicePrincipal("appsync.amazonaws.com"),
+                                            managed_policies=[
+                                                cloud_watch_role_full_access
+                                            ])
+
+```
+After creating the api, the next logical step is to attach the schema. We use the `CfnGraphQLSchema` method from the appsync
+class to achieve this. This method takes in a scope, an id, an api_id which should be a unique aws appsync graphql api identifier and 
+a definition(the schema file itself).
+
+```python
+
+dirname = path.dirname(__file__)
+
+with open(os.path.join(dirname, "../schema.graphql"), 'r') as file:
+    data_schema = file.read().replace('\n', '')
+schema = appsync.CfnGraphQLSchema(scope=self, id="schema", api_id=api.attr_api_id, definition=data_schema)
+
+```
+
+### Defining the Queue
+Let's define and attach the sqs queue to appsync. Firstly, we import the sqs class from cdk.
+
+`import aws_cdk.aws_sqs as sqs`
+
+Then, we'll create 2 queues and use one as the Dead letter queue.
+```python
+        # SQS
+        queue = sqs.CfnQueue(
+            self, "CdkAccelerateQueue",
+            visibility_timeout=300,
+            queue_name="sqs-queue"
+        )
+
+        deadLetterQueue = sqs.Queue(
+            self, "CdkAccelerateDLQueue",
+            visibility_timeout=Duration.minutes(10),
+            queue_name="dead-letter-queue"
+        )
+
+        sqs.DeadLetterQueue(max_receive_count=4, queue=deadLetterQueue)
+```
+
+The `visibility_timeout` is the time taken for a consumer to process and delete a message once dequeued. While this timeout is valid,
+the message is made unavailable to other consumers. If the timeout expires when the message hasn't been successfully processed
+and delivered, the message is sent back into the queue and made available for other consumers to pick up. 
+
+If you don't specify a value for the `visibility_timeout` , AWS CloudFormation uses the default value of 30 seconds. `Default: Duration.seconds(30)`
+
+The `max_receive_count` is the number of times a message can be unsuccesfully dequeued before being moved to the dead-letter queue. We
+set the value to 4, meaning after 4 unsuccessful dequeue attempts, that message would be sent to the DLQ.
+
+Now, let's attach the sqs queue to appsync.
+
+`  api.add_dependency(queue)`
+
+That's all. Remember the name of the api we created above was `api`.
+
+### Defining DynamoDB Resources
+Import the dynamodb class for cdk.
+`import aws_cdk.aws_dynamodb as dynamodb`
+
+Let's create a table called `ORDER` with a composite key. `user_id` for the primary key and `id` as the sort key.
+
+
+
+```python
+        # DynamoDB
+        dynamodb.CfnTable(self, "Table",
+                          key_schema=[dynamodb.CfnTable.KeySchemaProperty(
+                              attribute_name="user_id",
+                              key_type="HASH"
+                          ),
+                              dynamodb.CfnTable.KeySchemaProperty(
+                                  attribute_name="id",
+                                  key_type="RANGE"
+                              )],
+                          billing_mode="PAY_PER_REQUEST",
+                          table_name="ORDER",
+                          attribute_definitions=[dynamodb.CfnTable.AttributeDefinitionProperty(
+                              attribute_name="user_id",
+                              attribute_type="S"
+                          ),
+                              dynamodb.CfnTable.AttributeDefinitionProperty(
+                                  attribute_name="id",
+                                  attribute_type="S"
+                              )]
+                          )
+
+```
+### Defining SNS Resources
+Let's create an SNS topic with topic name `sns-topic`. As usual, we'll import the sns class from aws cdk
+
+ `from aws_cdk import aws_sns as sns`
+
+Then lets use `CfnTopic` adn `CfnTopicPolicy`  method from the sns class to create and grant policies to the sns topic.
+
+```python 
+        cfn_topic = sns.CfnTopic(self, "MyCfnTopic",
+                                 display_name="sns-topic",
+                                 fifo_topic=False,
+                                 topic_name="sns-topic"
+                                 )
+
+        sns_publish_policy = sns.CfnTopicPolicy(self, "MyCfnTopicPolicy",
+                                                policy_document=iam.PolicyDocument(
+                                                    statements=[iam.PolicyStatement(
+                                                        actions=["sns:Publish", "sns:Subscribe"
+                                                                 ],
+                                                        principals=[iam.AnyPrincipal()],
+                                                        resources=["*"]
+                                                    )]
+                                                ),
+                                                topics=[cfn_topic.attr_topic_arn]
+                                                )
+```
+
+The main subscriber to the sns topic would be the email address of the client placing the order. Therefore we need to 
+add `email` as a subscriber using `CfnSubscription` method.
+
+We'll be using the command line to pass in the email address.
+
+```python 
+        email_address = CfnParameter(self, "subscriptionEmail")
+        sns.CfnSubscription(self, "EmailSubscription",
+                            topic_arn=cfn_topic.attr_topic_arn,
+                            protocol="email",
+                            endpoint=email_address.value_as_string
+
+                            )
+```
+
+
+# 
 
 
 
@@ -191,12 +402,7 @@ Please open up your stack file, mine is `event_driven_cdk_app_stack.py`.
 
 
 
-
-
-
-
-
-## Rererences
+## References
 - https://aws.amazon.com/blogs/compute/introducing-maximum-concurrency-of-aws-lambda-functions-when-using-amazon-sqs-as-an-event-source/
 - https://aws.amazon.com/blogs/compute/understanding-how-aws-lambda-scales-when-subscribed-to-amazon-sqs-queues/
 - 

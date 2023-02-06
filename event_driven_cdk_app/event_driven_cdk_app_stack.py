@@ -1,24 +1,20 @@
-from os import path
 import os
-
+import json
+from os import path
 from constructs import Construct
 from aws_cdk import (
     Duration,
     Stack,
 
     aws_sqs as sqs, CfnParameter,
+    aws_appsync as appsync,
+    aws_iam as iam,
+    aws_sns as sns,
+    aws_dynamodb as dynamodb,
+    aws_stepfunctions as stepfunctions
 
 )
-import aws_cdk.aws_appsync as appsync
 
-from aws_cdk import aws_iam as iam
-from aws_cdk import aws_sns as sns
-
-from aws_cdk import aws_dynamodb as dynamodb
-
-import aws_cdk.aws_stepfunctions as stepfunctions
-
-import json
 from data_sources.post import create_data_source as create_post_ds
 from data_sources.delete import create_data_source as create_delete_ds
 from data_sources.update import create_data_source as create_update_ds
@@ -43,7 +39,6 @@ class EventDrivenCdkAppStack(Stack):
         cfn_topic = sns.CfnTopic(self, "MyCfnTopic",
                                  display_name="sns-topic",
                                  fifo_topic=False,
-                                 subscription=[],
                                  topic_name="sns-topic"
                                  )
 
@@ -64,9 +59,9 @@ class EventDrivenCdkAppStack(Stack):
         sns_full_access_role = iam.ManagedPolicy.from_aws_managed_policy_name(
             'AmazonSNSFullAccess')
         sqs_full_access_role = iam.ManagedPolicy.from_managed_policy_arn(self, "sqsSendMessage",
-                                                                                      'arn:aws:iam::aws:policy/AmazonSQSFullAccess')
+                                                                         'arn:aws:iam::aws:policy/AmazonSQSFullAccess')
         sf_full_access_role = iam.ManagedPolicy.from_aws_managed_policy_name(
-                                                   'AWSStepFunctionsFullAccess')
+            'AWSStepFunctionsFullAccess')
         appsync_cloud_watch_role = iam.Role(self, "AppSyncCloudWatchRole",
                                             assumed_by=iam.ServicePrincipal("appsync.amazonaws.com"),
                                             managed_policies=[
@@ -146,7 +141,7 @@ class EventDrivenCdkAppStack(Stack):
             queue_name="dead-letter-queue"
         )
 
-        sqs.DeadLetterQueue(max_receive_count=1, queue=deadLetterQueue)
+        sqs.DeadLetterQueue(max_receive_count=4, queue=deadLetterQueue)
 
         # APPSYNC
 

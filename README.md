@@ -356,7 +356,7 @@ Let's create an SNS topic with topic name `sns-topic`. As usual, we'll import th
 
  `from aws_cdk import aws_sns as sns`
 
-Then lets use `CfnTopic` adn `CfnTopicPolicy`  method from the sns class to create and grant policies to the sns topic.
+Then use `CfnTopic` and `CfnTopicPolicy`  methods from the sns class to create and grant policies to the sns topic.
 
 ```python 
         cfn_topic = sns.CfnTopic(self, "MyCfnTopic",
@@ -378,10 +378,10 @@ Then lets use `CfnTopic` adn `CfnTopicPolicy`  method from the sns class to crea
                                                 )
 ```
 
-The main subscriber to the sns topic would be the email address of the client placing the order. Therefore we need to 
-add `email` as a subscriber using `CfnSubscription` method.
+We'll use the clients email address to subscribe to the sns topic, so that they'll receive email updates on `success` or `failed` payments. Therefore, we need to 
+add `email` as a subscriber using `CfnSubscription` method from the sns class.
 
-We'll be using the command line to pass in the email address.
+We'll be using the command line to pass in the email address when deploying the application.
 
 ```python 
         email_address = CfnParameter(self, "subscriptionEmail")
@@ -393,8 +393,80 @@ We'll be using the command line to pass in the email address.
                             )
 ```
 
+### Step Functions Resources
+In this tutorial, we won't be looking at how to create a step functions workflow from scratch. I'll assume you at least have a basic understanding of the service.
 
-# 
+If you don't, don't worry. I've written a couple of articles to get you up and running in no time.
+
+- [Building Apps with Step Functions](https://phatrabbitapps.com/building-apps-with-step-functions)
+- [Building a Step Functions Workflow With CDK, AppSync, and Python](https://phatrabbitapps.com/building-a-step-functions-workflow-with-cdk-appsync-and-python)
+
+The step functions workflow has 4 lambda functions. Here's how it looks like visually. I exported this image from the step functions visual workflow.
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/stepfunctions_graph.png)
+
+At this point, we've created resources for 75% of the application. Let's go ahead and start creating the endpoints to consume these resources.
+
+##  ENDPOINTS
+### CREATE ORDER
+When a user places an order, a series of events happen
+- An appsync Mutation is invoked.The input to the Mutation is bundled and sent as a message to an SQS Queue.
+- A Lambda(post order lambda) polls the messages from the SQS Queue,extracts the order information and starts up a step functions workflow with order information as input.
+- The Step functions workflow contains 4 different lambdas(Initialize Order, Process Payment, Complete Order, Cancel Order). 
+- The Initialize Order function creates a new order in the database.
+- The Process Payment lambda randomly determines if payment has been made on an order or not. 
+- If payment was successful, the complete order lambda saves the order to the database and sends an email.
+- If payment failed, the order status is updated in the database and an email sent with failed status by the failed email lambda.
+
+Create a folder called `lambda-fns` inside your project folder. It'll contain all lambda functions for the application.
+
+I love separating each lambda function into a python package. Create a python package inside the `lambda-fns` folder called `post_order`. Then inside the 
+`post_order` python package, create a python file called `post_order.py`.
+
+This lambda function would poll messages from the sqs queue and start a step functions workflow. Therefore it'll need permission to receive sqs queue messages
+and start a step functions workflow.
+
+Let's define the code within the `post_order.py` file.
+Inside the handler function, type
+```python
+
+def handler(event, context):
+    new_order_list = []
+    print("event ", event)
+    for record in event["Records"]:
+        message_id = record["messageId"]
+        request_body = json.loads(record["body"])
+        order_data = request_body["input"]
+        print(f'post_orders reqeust_body {order_data} type: {type(order_data)}')
+        sfn_input = assemble_order(message_id, order_data)
+        response = start_sfn_exec(sfn_input, message_id)
+        print(f'start sfn execution: {response}')
+        new_order_list.append(response["executionArn"])
+    return new_order_list
+
+```
+Messages from a queue are polled as `Records`. We have to iterate over each record in order to extract the order information, assemble the order and use it 
+to start a step functions workflow.
+
+`sfn_input = assemble_order(message_id, order_data)` is method simply adds more random data to the order information. 
+
+`response = start_sfn_exec(sfn_input, message_id)` here's where we start the step functions workflow
+
+```python 
+def start_sfn_exec(sfn_input, sfn_exec_id):
+    response = sfn.start_execution(
+        stateMachineArn=STATE_MACHINE_ARN,
+        name=sfn_exec_id,
+        input=json.dumps(sfn_input, cls=DecimalEncoder)
+    )
+    print(f'post_orders start sfn_exec_id {sfn_exec_id} and input {sfn_input}')
+    return response
+```
+
+
+
+
+
 
 
 
@@ -406,21 +478,3 @@ We'll be using the command line to pass in the email address.
 - https://aws.amazon.com/blogs/compute/introducing-maximum-concurrency-of-aws-lambda-functions-when-using-amazon-sqs-as-an-event-source/
 - https://aws.amazon.com/blogs/compute/understanding-how-aws-lambda-scales-when-subscribed-to-amazon-sqs-queues/
 - 
-
-
-
-
-
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
-
-## Useful commands
-
- * `cdk ls`          list all stacks in the app
- * `cdk synth`       emits the synthesized CloudFormation template
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk docs`        open CDK documentation
-
-Enjoy!

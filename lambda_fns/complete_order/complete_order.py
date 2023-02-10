@@ -32,10 +32,7 @@ def update_order(order_status, event):
     message = {"order_status": order_status, "order_id": event["saveResults"]["id"]}
     send_order_notification(message)
     print(f'Order success sent {message}')
-    return {
-        "statusCode": 200,
-        "body": "Order created and notification sent"
-    }
+    return {"message": "Order created and notification sent"}
 
 
 def send_order_notification(message):
@@ -49,7 +46,7 @@ def send_order_notification(message):
     retrieved from Lambda Environment Variable TOPIC_ARN
     '''
     topic_arn = TOPIC_ARN
-    response = sns.publish(
+    sns.publish(
         TopicArn=topic_arn,
         Message=json.dumps(message),
         Subject=f'Orders-App: Update for order {message["order_id"]}'

@@ -42,7 +42,7 @@ class EventDrivenCdkAppStack(Stack):
                                  topic_name="sns-topic"
                                  )
 
-        sns_publish_policy = sns.CfnTopicPolicy(self, "MyCfnTopicPolicy",
+        sns_policy = sns.CfnTopicPolicy(self, "MyCfnTopicPolicy",
                                                 policy_document=iam.PolicyDocument(
                                                     statements=[iam.PolicyStatement(
                                                         actions=["sns:Publish", "sns:Subscribe"
@@ -56,8 +56,7 @@ class EventDrivenCdkAppStack(Stack):
         cloud_watch_role_full_access = iam.ManagedPolicy.from_managed_policy_arn(self, "cloudWatchLogRole",
                                                                                  'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess')
         db_full_access_role = iam.ManagedPolicy.from_aws_managed_policy_name('AmazonDynamoDBFullAccess')
-        sns_full_access_role = iam.ManagedPolicy.from_aws_managed_policy_name(
-            'AmazonSNSFullAccess')
+
         sqs_full_access_role = iam.ManagedPolicy.from_managed_policy_arn(self, "sqsSendMessage",
                                                                          'arn:aws:iam::aws:policy/AmazonSQSFullAccess')
         sf_full_access_role = iam.ManagedPolicy.from_aws_managed_policy_name(
@@ -76,9 +75,8 @@ class EventDrivenCdkAppStack(Stack):
         lambda_step_function_role = iam.Role(self, "LambdaStepFunctionRole",
                                              assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
                                              managed_policies=[db_full_access_role,
-                                                               sns_full_access_role,
                                                                cloud_watch_role_full_access,
-                                                               sns_publish_policy])
+                                                               sns_policy])
 
         lambda_execution_role = iam.Role(self, "LambdaExecutionRole",
                                          assumed_by=iam.AnyPrincipal(),

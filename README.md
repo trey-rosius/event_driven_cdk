@@ -44,12 +44,22 @@ Now that we have a brief understanding of what EDA's are, let's go ahead and div
 We'll use the concept of EDA's to design and build a modern serverless graphql api.
 
 ## Use Case
-We'll simulate a scenario whereby, a restaurant receives orders from clients through a graphql endpoint, processes those orders with client payments 
-and send emails back to the client if payment either `failed` or `succeeded`.
+Let's say you want to order pizza from a restaurant, through the restaurants mobile or web application. In an ideal scenario, 
+the application would let you make(add to cart) your choice of pizza,the quantity you want, with all necessary addons like extra cheese, chilli, and 
+only lets you sign in to or create an account when you wish to place the order.
 
-While at it, we'll create more graphql endpoints, using direct lambda resolvers, in order to mimic a semi real life scenario.
+In this tutorial, we'll assume you've already created an account, and you are about to place an order. Once your order has been placed,
+we'll run a fake payment check to determine if you've made payment or not, and would email you based on the `success` or 
+`failure` of your order payment.
 
-### AWS Services used
+We'll be using a couple of AWS Services to illustrate how all these can be accomplished, in a scalable, decoupled, event driven
+manner. 
+
+So stay tuned in
+
+Let's take a quick look at the aws services we'll be using in this application.
+
+### AWS Services
 
 #### [AWS AppSync](https://aws.amazon.com/appsync/)
 AWS AppSync is a fully managed service allowing developers to deploy scalable and engaging real-time GraphQL backends on AWS.
@@ -377,11 +387,13 @@ Then use `CfnTopic` and `CfnTopicPolicy`  methods from the sns class to create a
                                                 topics=[cfn_topic.attr_topic_arn]
                                                 )
 ```
+Bear in mind that, we've assumed the client is already signed in to our application at this point. So we have their email address.
+We'll use the clients email address to subscribe to the sns topic, so that they'll receive email updates on `success` or `failed` payments.
 
-We'll use the clients email address to subscribe to the sns topic, so that they'll receive email updates on `success` or `failed` payments. Therefore, we need to 
-add `email` as a subscriber using `CfnSubscription` method from the sns class.
+For the purpose of this tutorial, we'll subscribe to sns using an email passed in as a parameter from the commandline, when deploying the application later.
 
-We'll be using the command line to pass in the email address when deploying the application.
+For now, we need to add `email` as a subscriber using `CfnSubscription` method from the sns class.
+
 
 ```python 
         email_address = CfnParameter(self, "subscriptionEmail")
@@ -394,7 +406,7 @@ We'll be using the command line to pass in the email address when deploying the 
 ```
 
 ### Step Functions Resources
-In this tutorial, we won't be looking at how to create a step functions workflow from scratch. I'll assume you at least have a basic understanding of the service.
+We won't be looking at how to create a step functions workflow from scratch. I'll assume you at least have a basic understanding of the service.
 
 If you don't, don't worry. I've written a couple of articles to get you up and running in no time.
 
@@ -405,6 +417,137 @@ The step functions workflow has 4 lambda functions. Here's how it looks like vis
 
 ![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/stepfunctions_graph.png)
 
+I also exported the workflow as a json file, and saved the file inside a python package called `step_function_workflow` in the project directory.
+
+You can create a python package with same name and get the file here. [workflow.json](https://github.com/trey-rosius/event_driven_cdk/blob/master/step_function_workflow/workflow.json)
+
+For the 4 lambda functions,navigate to the `lambda_fns` folder, create 4 python packages, and within each package, create a python file.
+These python files would serve as lambda functions.
+
+1) MODULE NAME: initialize_order, FILE NAME: initialize_order.py 
+2) MODULE NAME: process_payment,  FILE NAME: process_payment.py
+3) MODULE NAME: complete_order,   FILE NAME: complete_order.py
+4) MODULE NAME: cancel_failed_order, FILE NAME: cancel_failed_order.py
+
+Create a file called `step_function.py` within the `step_function_workflow` python package .We'll define all the lambda functions resources needed by the workflow within 
+this file.
+
+We have to create a lambda resource for each of the above 4 python files,add them to the step functions workflow and then return a step functions instance.
+
+In order to create a lambda function resource, we need to first import the `aws_lambda` class from cdk.
+
+`from aws_cdk import aws_lambda as lambda_`
+
+Create a function with these parameters. We'll be passing in the stack, lambda permissions and a sns topic we created in the stack file.
+
+`def create_step_function(stack, lambda_step_function_role, cfn_topic):`
+
+Next, using the function `CfnFunction` found within the `aws_lambda` class, let's create the lambda function resource for `initialize_order.py`.
+
+Firstly, we need to return a stream of the lambda function, using the `open` method. We'll repeat these same steps for the other
+lambda functions.
+
+```python
+with open("lambda_fns/initialize_order/initialize_order.py", 'r') as file:
+    initialize_order = file.read()
+```
+
+Then, we define the resource the lambda function needs
+
+```python
+
+    initialize_order_function = lambda_.CfnFunction(stack, "initialize-order-function",
+                                                    code=lambda_.CfnFunction.CodeProperty(
+                                                        zip_file=initialize_order
+                                                    ),
+                                                    role=lambda_step_function_role.role_arn,
+
+                                                    # the properties below are optional
+                                                    architectures=["x86_64"],
+                                                    description="lambda-ds",
+                                                    environment=lambda_.CfnFunction.EnvironmentProperty(
+                                                        variables={
+                                                            "ORDER_TABLE": "ORDER",
+                                                            "TOPIC_ARN": cfn_topic.attr_topic_arn
+                                                        }
+                                                    ),
+                                                    function_name="initialize-order-function",
+                                                    handler="index.handler",
+                                                    package_type="Zip",
+                                                    runtime="python3.9",
+                                                    timeout=123,
+                                                    tracing_config=lambda_.CfnFunction.TracingConfigProperty(
+                                                        mode="Active"
+                                                    )
+                                                    )
+
+```
+
+Here's what's happening in the above code.
+
+To Create a lambda function, we need a deployment package and an execution role. Our deployment package in this case is a zip file, 
+containing the `initialize_order` lambda code.You can also use a container image as your deployment package.
+
+```
+code=lambda_.CfnFunction.CodeProperty(zip_file=initialize_order),
+```
+
+We also need an execution role which grants the function permission to access other aws services such as step functions, cloudwatch etc
+
+`role=lambda_step_function_role.role_arn,`
+
+Here are the policies we attached to the lambda function role in the stack file.
+- Full DynamoDB access(Because we'll be saving the order to the database)
+- Full SNS access for sending emails 
+- Full CloudWatch access for logging
+- 
+```python
+        lambda_step_function_role = iam.Role(self, "LambdaStepFunctionRole",
+                                             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+                                             managed_policies=[db_full_access_role,
+                                                               cloud_watch_role_full_access,
+                                                               sns_policy])
+
+```
+Then we set the environment variables that we'll be needing in our lambda function.In this case, it's the dynamodb tablename and sns topic amazon resource
+name(arn).
+
+Next, we state the runtime(python 3.9),handler name(which we'll define later within initialize_order.py file, the lambda timeout in seconds. Note that a lambda function can't run above 15 minutes.
+
+Repeat this same steps for the other 3 lambda functions.
+
+Use the file on github as a reference.[step_function.py](https://github.com/trey-rosius/event_driven_cdk/blob/master/step_function_workflow/step_function.py)
+
+At the bottom of the `step_function.py` file, we have to define the step functions workflow template and also add the created lambda functions arn's.
+
+```python
+ sf_workflow = Template(workflow).substitute(InitializeOrderArn=initialize_order_function.attr_arn,
+                                                ProcessPaymentArn=process_payment_function.attr_arn,
+                                                CompleteOrderArn=complete_order_function.attr_arn,
+                                                CancelFailedOrderArn=cancel_failed_order_function.attr_arn, dollar="$")
+
+    return sf_workflow
+```
+Inside the `workflow.json` file, there's a line like this 
+
+`"FunctionName": "$InitializeOrderArn"`
+
+We use the `substitute` method above to replace that line with the arn to where the lambda function resides `InitializeOrderArn=initialize_order_function.attr_arn`.
+
+Now, go to the stack file of your application, and type in the following code to create a step functions state machine.
+Firstly, we need to call the `create_step_function(self, lambda_step_function_role, cfn_topic)` we defined above and pass it's return type to our statemachine's definition.
+
+Also, the state machine needs permissions to interact with other aws services. So we grant step functions permissions to execute lambda functions.
+
+```python
+        workflow = create_step_function(self, lambda_step_function_role, cfn_topic)
+
+        simple_state_machine = stepfunctions.CfnStateMachine(self, "SimpleStateMachine",
+                                                             definition=json.loads(workflow),
+                                                             role_arn=lambda_execution_role.role_arn
+                                                             )
+```
+
 At this point, we've created resources for 75% of the application. Let's go ahead and start creating the endpoints to consume these resources.
 
 ##  ENDPOINTS
@@ -414,20 +557,17 @@ When a user places an order, a series of events happen
 - A Lambda(post order lambda) polls the messages from the SQS Queue,extracts the order information and starts up a step functions workflow with order information as input.
 - The Step functions workflow contains 4 different lambdas(Initialize Order, Process Payment, Complete Order, Cancel Order). 
 - The Initialize Order function creates a new order in the database.
-- The Process Payment lambda randomly determines if payment has been made on an order or not. 
-- If payment was successful, the complete order lambda saves the order to the database and sends an email.
-- If payment failed, the order status is updated in the database and an email sent with failed status by the failed email lambda.
+- The Process Payment lambda randomly assigns a `success` or `failed` payment status to the order. 
+- If payment was successful, the complete order lambda update the order in the database and sends an email to the client.
+- If payment failed, the order status is updated in the database and an email sent with failed status to the client through the failed email lambda.
 
-Create a folder called `lambda-fns` inside your project folder. It'll contain all lambda functions for the application.
+Create a python package inside the `lambda-fns` folder called `post_order`. Then inside that folder, create a python file called `post_order.py`.
 
-I love separating each lambda function into a python package. Create a python package inside the `lambda-fns` folder called `post_order`. Then inside the 
-`post_order` python package, create a python file called `post_order.py`.
-
-This lambda function would poll messages from the sqs queue and start a step functions workflow. Therefore it'll need permission to receive sqs queue messages
-and start a step functions workflow.
+This lambda function would poll messages from the sqs queue and start a step functions workflow. Therefore, it'll need permission to receive sqs queue messages
+and to start a step functions workflow.
 
 Let's define the code within the `post_order.py` file.
-Inside the handler function, type
+
 ```python
 
 def handler(event, context):
@@ -448,9 +588,10 @@ def handler(event, context):
 Messages from a queue are polled as `Records`. We have to iterate over each record in order to extract the order information, assemble the order and use it 
 to start a step functions workflow.
 
-`sfn_input = assemble_order(message_id, order_data)` is method simply adds more random data to the order information. 
+`sfn_input = assemble_order(message_id, order_data)` This method simply adds more random data to the created order and returns the order. 
 
-`response = start_sfn_exec(sfn_input, message_id)` here's where we start the step functions workflow
+`response = start_sfn_exec(sfn_input, message_id)` here's where we start the step functions workflow, using the step function arn and 
+the order data as input.
 
 ```python 
 def start_sfn_exec(sfn_input, sfn_exec_id):

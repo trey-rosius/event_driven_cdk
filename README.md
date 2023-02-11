@@ -900,6 +900,21 @@ Clicking on the link in the email subscribes that email to the sns topic we crea
 
 If you log into the aws console and navigate to sns, under your topic, you should see all subscribed emails.
 
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/sns_topic.png)
+
+
+Subscribers
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/sns_sub.png)
+
+
+Navigate to appsync from the aws console. Select and open your project from the list of api's.
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/appsync_api.png)
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/settings.png)
+
+t text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/valid_api.png)
 
 
 

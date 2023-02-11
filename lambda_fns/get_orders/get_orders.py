@@ -10,6 +10,7 @@ def process_response(data):
     data['quantity'] = data['quantity']['N']
     data['name'] = data['name']['S']
     data['restaurantId'] = data['restaurantId']['S']
+    data['orderStatus'] = data['orderStatus']['S']
 
     return data
 

@@ -914,7 +914,14 @@ Navigate to appsync from the aws console. Select and open your project from the 
 
 ![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/settings.png)
 
-t text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/valid_api.png)
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/valid_api.png)
+
+### API TESTING WITH GRAPHBOLT
+AWS Appsync provides a console for testing graphql APIs once deployed.But the console times out after a while of in-activity.
+
+So you always have to either make sure the console doesn't time out or be ready to log back in, everytime it logs out.
+
+
 
 
 

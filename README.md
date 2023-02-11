@@ -905,7 +905,7 @@ If you log into the aws console and navigate to sns, under your topic, you shoul
 
 Subscribers
 
-![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/sns_sub.png)
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/sns-sub.png)
 
 
 Navigate to appsync from the aws console. Select and open your project from the list of api's.

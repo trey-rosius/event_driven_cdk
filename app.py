@@ -7,9 +7,7 @@ from event_driven_cdk_app.event_driven_cdk_app_stack import EventDrivenCdkAppSta
 
 app = cdk.App()
 EventDrivenCdkAppStack(app, "EdCdkAppStack",
-
                        env=cdk.Environment(account='132260253285', region='us-east-2'),
-
                        )
 
 app.synth()

@@ -2,7 +2,7 @@ from aws_cdk import aws_lambda as lambda_
 import aws_cdk.aws_appsync as appsync
 
 
-def create_data_source(stack, api, schema, db_role, lambda_execution_role):
+def get_all_orders_data_source(stack, api, schema, db_role, lambda_execution_role):
     with open("lambda_fns/get_orders/get_orders.py", 'r') as file:
         geta_all_order_lambda_function = file.read()
 
@@ -41,6 +41,7 @@ def create_data_source(stack, api, schema, db_role, lambda_execution_role):
                                                              service_role_arn=lambda_execution_role.role_arn)
 
     # Resolvers
+
     ## list orders resolver
     get_all_orders_resolver = appsync.CfnResolver(stack, "list-orders",
                                                   api_id=api.attr_api_id,

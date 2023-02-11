@@ -740,7 +740,167 @@ We would be using a lambda resolver to resolve this endpoint. Other alternatives
 From my experience building Graphql APIs, it's always better to use VTL resolvers for querying purposes. They are quicker, no cold starts and 
 ideal in situations where there is fewer data manipulation.
 
-But for this tutorial, we'll be querying the data using a lambda resolver. Sorry 😅
+But for this tutorial, we'll be querying the order data using a lambda resolver. Sorry 😅
+
+The first step towards creating our resolver is to first create a handler with the code for query dynamodb 
+
+Create a python package called `get_orders` within the `lambda-fns` folder. Create a python file called `get_order.py` within
+the `get_orders` folder.
+
+Type in the following code to query all orders from the table.
+
+```python 
+
+def process_response(data):
+    print(data)
+    data['quantity'] = data['quantity']['N']
+    data['name'] = data['name']['S']
+    data['restaurantId'] = data['restaurantId']['S']
+
+    return data
+
+
+def fetch_all_orders(dynamo_client, table_name):
+    results = []
+    last_evaluated_key = None
+    while True:
+        if last_evaluated_key:
+            response = ddb_client.scan(
+                TableName=table_name,
+                ExclusiveStartKey=last_evaluated_key
+            )
+        else:
+            response = dynamo_client.scan(TableName=table_name)
+
+        last_evaluated_key = response.get('LastEvaluatedKey')
+        response = map(process_response, response['Items'])
+        response = list(response)
+        results.extend(response)
+
+        if not last_evaluated_key:
+            break
+    print(f'fetch_all_orders returned {results}')
+    return results
+
+
+def handler(event, context):
+    items = fetch_all_orders(ddb_client, TABLE_NAME)
+    return items
+
+```
+We are using a `scan` and `LastEvaluatedKey` to paginate through the data in the database.This is not efficient.
+This is for tutorial purposes only. 
+
+In a real application, you'll want to make use of the `query` function and Global Secondary indexes(GSI) for better performance.
+
+The next step is to define the lambda resources, the datasource and lambda resolver.
+
+I created a seperate folder for files like this. So within the root folder, create a python package called `data_sources`.
+Within that folder, create a python file called `get_all_orders.py`.
+
+Type in the following code. 
+
+```python 
+
+def get_all_orders_data_source(stack, api, schema, db_role, lambda_execution_role):
+    with open("lambda_fns/get_orders/get_orders.py", 'r') as file:
+        geta_all_order_lambda_function = file.read()
+
+    get_all_order_function = lambda_.CfnFunction(stack, "gets",
+                                                 code=lambda_.CfnFunction.CodeProperty(
+                                                     zip_file=geta_all_order_lambda_function
+                                                 ),
+                                                 role=db_role.role_arn,
+
+                                                 # the properties below are optional
+                                                 architectures=["x86_64"],
+                                                 description="lambda-ds",
+                                                 environment=lambda_.CfnFunction.EnvironmentProperty(
+                                                     variables={
+                                                         "ORDER_TABLE": "ORDER"
+                                                     }
+                                                 ),
+                                                 function_name="get-orders-function",
+                                                 handler="index.handler",
+                                                 package_type="Zip",
+                                                 runtime="python3.9",
+                                                 timeout=123,
+                                                 tracing_config=lambda_.CfnFunction.TracingConfigProperty(
+                                                     mode="Active"
+                                                 )
+                                                 )
+
+```
+
+We've seen similar code like this above. So lets go ahead and create a new appsync datasource and then attach our lambda to it.
+
+Within the same file, type in this code 
+
+```python 
+
+    lambda_get_all_order_config_property = appsync.CfnDataSource.LambdaConfigProperty(
+        lambda_function_arn=get_all_order_function.attr_arn
+    )
+
+    lambda_get_all_order_data_source = appsync.CfnDataSource(scope=stack, id="lambda-getAll-order-ds",
+                                                             api_id=api.attr_api_id,
+                                                             name="lambda_getAll_order_ds", type="AWS_LAMBDA",
+                                                             lambda_config=lambda_get_all_order_config_property,
+                                                             service_role_arn=lambda_execution_role.role_arn)
+```
+Using the `LambdaConfigProperty` we specify the lambda functions arn for appsync's datasource. Then in the `CfnDataSource` method,
+we specify the appsync's api id, the type of datasource(AWS_LAMBDA) the name of the datasource, the lambda configuration and and 
+AWS IAM role arn for the datasource.
+
+Next step is defining the resolver.
+
+```python
+
+    ## list orders resolver
+    get_all_orders_resolver = appsync.CfnResolver(stack, "list-orders",
+                                                  api_id=api.attr_api_id,
+                                                  field_name="orders",
+                                                  type_name="Query",
+                                                  data_source_name=lambda_get_all_order_data_source.name)
+```
+In the above code, using the `CfnResolver` method from appsync, we app in the appsync api id, the field_name and type_name as specified
+in the graphql schema, and also the name of the datasource we created above.
+
+Lastly, since the resolver depends on the graphql schema and datasource, we need to specify that also, using the `add_dependency` method.
+
+```python 
+    get_all_orders_resolver.add_dependency(schema)
+    get_all_orders_resolver.add_dependency(lambda_get_all_order_data_source)
+```
+
+The final step is to call this function `get_all_orders_data_source(stack, api, schema, db_role, lambda_execution_role)` from the 
+stack file and pass in all required parameters.
+
+## Deploy
+I'll assume you've already added your account and region as environment variables to your app file in `app.py`.
+
+Run 
+
+`cdk synth` in order to synthesize your app.
+
+Then run 
+
+`cdk bootstrap` to provision CloudFormation resources to the environment(region and account) we added to the app above.
+
+Finally, we have to deploy the app. Remember that we need to pass in an email address as parameter during deployment, so that it can 
+be used to subscribe to sns for emails.
+
+Run this command to deploy your app
+
+`cdk deploy --parameter subscriptionEmail=YOUR_EMAIL_ADDRESS`
+
+If the app successfully deployed, you should receive a subscription email from amazon. Check your spam folder.
+
+Clicking on the link in the email subscribes that email to the sns topic we created above `sns topic`.
+
+If you log into the aws console and navigate to sns, under your topic, you should see all subscribed emails.
+
+
 
 
 

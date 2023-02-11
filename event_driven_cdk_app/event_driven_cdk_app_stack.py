@@ -19,7 +19,7 @@ from event_driven_cdk_app.post_order_resource import create_post_order_lambda_re
 from data_sources.delete import create_data_source as create_delete_ds
 from data_sources.update import create_data_source as create_update_ds
 from data_sources.get_by_id import create_data_source as create_get_by_id_ds
-from data_sources.get_all import create_data_source as create_get_all_ds
+from data_sources.get_all_orders import get_all_orders_data_source
 from data_sources.send_sqs_message import create_data_source as create_sqs_send_message_ds
 from step_function_workflow.step_function import create_step_function
 
@@ -172,6 +172,6 @@ class EventDrivenCdkAppStack(Stack):
         create_delete_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
         create_update_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
         create_get_by_id_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        create_get_all_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        get_all_orders_data_source(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
         create_sqs_send_message_ds(self, api, schema, sqs_sendMessage_role, lambda_execution_role, queue)
         create_post_order_lambda_resource(self, simple_state_machine, sqs_receiveMessage_role, queue)

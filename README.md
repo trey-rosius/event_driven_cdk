@@ -727,6 +727,23 @@ See the complete code here [complete_order](https://github.com/trey-rosius/event
 
 Same thing with `cancel_failed_order.py` function [Cancel Failed Order](https://github.com/trey-rosius/event_driven_cdk/blob/master/lambda_fns/cancel_failed_order/cancel_failed_order.py)
 
+At this point, we could deploy and test the app. But i think it'll be better to add at least one more endpoint before deploying.
+
+I would love to see a list of all the orders made.
+
+From the graphql schema, the endpoint is under `Query`
+
+`orders: [ Order ]!`
+
+We would be using a lambda resolver to resolve this endpoint. Other alternatives are VTL resolvers or the newly added javascript Resolvers.
+
+From my experience building Graphql APIs, it's always better to use VTL resolvers for querying purposes. They are quicker, no cold starts and 
+ideal in situations where there is fewer data manipulation.
+
+But for this tutorial, we'll be querying the data using a lambda resolver. Sorry 😅
+
+
+
 
 
 

@@ -15,7 +15,7 @@ from aws_cdk import (
 
 )
 
-from data_sources.post import create_data_source as create_post_ds
+from event_driven_cdk_app.post_order_resource import create_post_order_lambda_resource
 from data_sources.delete import create_data_source as create_delete_ds
 from data_sources.update import create_data_source as create_update_ds
 from data_sources.get_by_id import create_data_source as create_get_by_id_ds
@@ -54,7 +54,8 @@ class EventDrivenCdkAppStack(Stack):
                                                 topics=[cfn_topic.attr_topic_arn]
                                                 )
         cloud_watch_role_full_access = iam.ManagedPolicy.from_managed_policy_arn(self, "cloudWatchLogRole",
-                                                                                 'arn:aws:iam::aws:policy/CloudWatchLogsFullAccess')
+                                                                                 'arn:aws:iam::aws:policy'
+                                                                                 '/CloudWatchLogsFullAccess')
         db_full_access_role = iam.ManagedPolicy.from_aws_managed_policy_name('AmazonDynamoDBFullAccess')
 
         sqs_full_access_role = iam.ManagedPolicy.from_managed_policy_arn(self, "sqsSendMessage",
@@ -173,4 +174,4 @@ class EventDrivenCdkAppStack(Stack):
         create_get_by_id_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
         create_get_all_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
         create_sqs_send_message_ds(self, api, schema, sqs_sendMessage_role, lambda_execution_role, queue)
-        create_post_ds(self, simple_state_machine, sqs_receiveMessage_role, queue)
+        create_post_order_lambda_resource(self, simple_state_machine, sqs_receiveMessage_role, queue)

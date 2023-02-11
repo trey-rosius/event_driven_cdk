@@ -590,6 +590,16 @@ to start a step functions workflow.
 
 `sfn_input = assemble_order(message_id, order_data)` This method simply adds more random data to the created order and returns the order. 
 
+```python
+def assemble_order(message_id, order_data):
+    now = datetime.now()
+    order_data["user_id"] = "demo_user"
+    order_data["id"] = message_id
+    order_data["orderStatus"] = DEFAULT_ORDER_STATUS
+    order_data["createdAt"] = now.isoformat()
+    return json.dumps(order_data, cls=DecimalEncoder)
+```
+
 `response = start_sfn_exec(sfn_input, message_id)` here's where we start the step functions workflow, using the step function arn and 
 the order data as input.
 
@@ -603,7 +613,119 @@ def start_sfn_exec(sfn_input, sfn_exec_id):
     print(f'post_orders start sfn_exec_id {sfn_exec_id} and input {sfn_input}')
     return response
 ```
+Now, lets define the resources and permissions this lambda function needs. It's pretty similar to the step functions lambda resources
+we defined above.
 
+Within the stack folder, mine is `event_driven_cdk_app` create a file called `post_order_resource.py` and type in the following code.
+
+```python
+
+def create_post_order_lambda_resource(stack, simple_state_machine, sqs_receive_message_role, queue):
+    with open("lambda_fns/post_order/post_order.py", 'r') as file:
+        post_function_file = file.read()
+
+    post_function = lambda_.CfnFunction(stack, "post",
+                                        code=lambda_.CfnFunction.CodeProperty(
+                                            zip_file=post_function_file
+                                        ),
+                                        role=sqs_receive_message_role.role_arn,
+
+                                        # the properties below are optional
+                                        architectures=["x86_64"],
+                                        description="lambda-ds",
+                                        environment=lambda_.CfnFunction.EnvironmentProperty(
+                                            variables={
+                                                "ORDER_TABLE": "ORDER",
+                                                "STATE_MACHINE_ARN": simple_state_machine.attr_arn
+                                            }
+                                        ),
+                                        function_name="post-order-function",
+                                        handler="index.handler",
+                                        package_type="Zip",
+                                        runtime="python3.9",
+                                        timeout=123,
+                                        tracing_config=lambda_.CfnFunction.TracingConfigProperty(
+                                            mode="Active"
+                                        )
+                                        )
+
+    lambda_.EventSourceMapping(scope=stack, id="MyEventSourceMapping",
+                               target=post_function,
+                               batch_size=5,
+                               enabled=True,
+                               event_source_arn=queue.attr_arn)
+
+```
+It's very identical to the one we defined above, except for the last part 
+
+```python 
+    lambda_.EventSourceMapping(scope=stack, id="MyEventSourceMapping",
+                               target=post_function,
+                               batch_size=5,
+                               enabled=True,
+                               event_source_arn=queue.attr_arn)
+```
+Remember, this function is responsible for polling messages from an SQS queue. We subscribe to the sqs queue using the `EventSourceMapping` function 
+of the lambda API by passing in the sqs queue arn as the event source `event_source_arn=queue.attr_arn`.
+
+The `batch_size` indicates the amount of messages to be polled from sqs aat a time.
+
+When this function invokes a step function workflow, the first lambda to run in the workflow is the `initialize_order.py` lambda function.
+
+We created the file in the `initialize_order` python package, but we didn't add any code to it. Open up `initialize_order.py` and type in the 
+following code.
+
+All we do is save the order to the database and forward the order details to the next function, which is `process_payment.py`
+```python 
+def persist_order(order_item):
+    print(f'persist_order item {order_item} to table {TABLE_NAME}')
+    response = table.put_item(Item=order_item)
+    message = {"order_status": order_item["orderStatus"], "order_id": order_item["id"]}
+    print(f'new order pending payment {message}')
+    return {
+
+        "message": json.dumps(order_item, indent=4, cls=DecimalEncoder)
+    }
+
+```
+You can grab the complete code here 
+The `process_payment.py` function randomly assigns a payment state(`ok` or `error`) and an error message if the randomly assigned state was `error`,and then
+moves to the next function. 
+
+The next function is determined by a choice state based on the state of the payment. The next function would be `complete_order.py` if the payment 
+state was `ok` or it'll be `cancel_failed_order.py` if the payment state was `error`.
+
+In either of these functions, the order is updated in the database, and an email is sent through SNS.
+
+For the complete order function, the order is updated like so
+
+```python
+    response = table.update_item(
+        Key={
+            "user_id": event["saveResults"]["user_id"],
+            "id": event["saveResults"]["id"]
+        },
+        UpdateExpression="set orderStatus = :s",
+        ExpressionAttributeValues={
+            ":s": order_status
+        },
+        ReturnValues="UPDATED_NEW"
+    )
+```
+And an email is sent as such
+
+```python 
+
+  sns.publish(
+        TopicArn=topic_arn,
+        Message=json.dumps(message),
+        Subject=f'Orders-App: Update for order {message["order_id"]}'
+
+    )
+```
+See the complete code here [complete_order](https://github.com/trey-rosius/event_driven_cdk/tree/master/lambda_fns/complete_order)
+
+Same thing with `cancel_failed_order.py` function [Cancel Failed Order](https://github.com/trey-rosius/event_driven_cdk/blob/master/lambda_fns/cancel_failed_order/cancel_failed_order.py)
 
 
 

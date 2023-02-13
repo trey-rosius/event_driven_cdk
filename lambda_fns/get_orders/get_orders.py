@@ -7,6 +7,7 @@ TABLE_NAME = os.environ.get("ORDER_TABLE")
 
 def process_response(data):
     print(data)
+    data['id'] = data['id']['S']
     data['quantity'] = data['quantity']['N']
     data['name'] = data['name']['S']
     data['restaurantId'] = data['restaurantId']['S']

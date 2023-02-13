@@ -5,7 +5,7 @@ type Schema {
 }
 
 type Order {
-
+    id:ID!
     name: String!
     quantity: Int!
     restaurantId: String!

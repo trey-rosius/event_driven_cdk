@@ -16,7 +16,7 @@ def get_order_by_id(event):
         }
     )
 
-    return item
+    return item['Item']
 
 
 def handler(event, context):

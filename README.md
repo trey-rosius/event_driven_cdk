@@ -917,14 +917,149 @@ Navigate to appsync from the aws console. Select and open your project from the 
 ![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/valid_api.png)
 
 ### API TESTING WITH GRAPHBOLT
-AWS Appsync provides a console for testing graphql APIs once deployed.But the console times out after a while of in-activity.
+When it comes to testing GraphQL API's, there are a couple of options you can use.
+The very first one is the AWS AppSync Console. It comes loaded with stuff like 
+- Authentication
+- All Queries,Mutations and Subscriptions
+- API Testing Interface
+- View And edit VTL templates, Functions and Pipelines
+- And a lot more.
 
-So you always have to either make sure the console doesn't time out or be ready to log back in, everytime it logs out.
+Irrespective of all its pros, it has a couple of cons which slow down developer productivity and have you thinking about 
+alternatives.For example
+- Console Time out. I don't like signing into the console every 20 minutes of inactivity. This timeout can be increased to 
+60 minutes in the AWS settings. But security wise, this isn't ideal. I don't need to expose my entire AWS Console because i'm testing
+an appsync api. 
+- Debugging your endpoint from appsync is no fun. You need to open up the endpoint in cloudwatch and search for the error through
+a hundred logs. This is one of the main reasons why observability platforms are sprewing up every single day. Searching through 
+cloudwatch logs in stressful.
+
+There are API clients out there that make managing, testing and debugging GraphQL API's Fun.
+
+Say Hi to Graphbolt.
+## GRAPHBOLT
+GraphBolt is a one-stop shop for everything related to AppSync to help you manage, build, test and debug AppSync APIs.
+
+The query client allows you to execute queries and mutations, just like with Postman or Insomnia. But it is Tailored for AppSync. 
+That means that for example things like authentication (Cognito , API key, etc) are built in and auto detected. 
+You only have to chose the right one. API keys are auto-detected and you only need to chose one vs go copy and paste it in postman.
+
+Let's take a quick look at it's interface
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/graphbolt.png)
+
+At the top of the image, GraphBolt displays the auto detected AWS Profile you've configured on you computer. I've highlighted
+it with a yellow rectangle.
+You can click the dropdown to see all detected AWS profiles.
+
+Top right hand side, there's a lock 🔒 sign highlighted in pink.Use in configuring authentication.
+
+On the light hand side of the image, i've highlighted 3 icons with a blue rectangle. 
+The first icon is the Query Client.Provides an interface for building and running graphql endpoints
+The second icon is the Query Inpector. Provides an interface for debugging 
+The third icon is Mapping Template Designer. Build and evaluate VTL templates and javascript resolvers.
+
+On the right hand side of the image, i've highlighted the bug icon with a red rectangle. That icon also takes you to the 
+query inspector screen, to debug the api endpoint you just ran.
+
+Then we have the green, purple and black rectangles.
+
+Green rectangle is for building the query.
+Purple is for providing variables to a query
+Black is for displaying the response to the request when ran. It contains the body and header of the response.
+
+Clicking on the bug icon takes you to this screen.(Query Inspector)
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/debug.png)
+
+It has the Resolvers, Query, Request Headers, Response Headers and Raw logs for the GraphQl Query you just ran. 
+
+I've highlighted an eye icon on the right, we'll see it's use later.
+
+With GraphBolt, you don't need to open up CloudWatch in order to debug your api. Just execute a request. Seeing something wrong? 
+Click the 🪲 button(top right hand side) and you’re taken to the query inspector screen.
+
+There, you can visualize all the resolvers that were executed. All errors will be highlighted in red.
+
+By clicking on the 👁  of any resolver, you can dig in and instantly see the `$context` object, 
+the compile mapping template and the response from the data source.
+
+Finally, you will also see the result of the resolver (returned value).
+
+This allows you to understand what is going on.
+
+We'll definitely be using GraphBolt to test this and subsequest API's.
+
+So the first endpoint i want to test is the `postOrder` endpoint. I want to place and order, and see it gets executed successfully 
+or not. 
+I expect a message to be sent to SQS, the `postOrder` function should poll and start a step functions workflow, and the an email 
+should be sent to confirm if payment was successful or not.
+
+Let's check to see if we have a valid api key first. Click on the lock icon 
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/api_key.png)
+
+The key is valid. If you don't have a valid key or no key at all, go to the settings menu in the appsync console and create one.
+
+Graphbolt would automatically detect the key once it has been created.
+
+I'll make a request with this input. I want 6 cartons of pizza from Dominos Pizza.
+
+```json
+    name:"Pizza",
+    quantity:6,
+    restaurantId:"Dominos Pizza"
+```
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/postOrder.png)
+
+Then hit send.
+
+Log into AWS Console and navigate to the `postOrder` lambda functions cloudwatch logs. You should see a log message from 
+SQS. The `postOrder` function polled the message from SQS.
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/post_order_logs.png)
+
+If you look detailly at the message, you would see the input we sent to appsync in the body of the message.
+```json
+{
+   "Records":[
+      {
+         "messageId":"80ddd9e2-740c-4c20-b6ce-c141382a21c8",
+         "receiptHandle":"AQEBzS2lYHfSFDM79iWKIYQ3tydLNRuZWs7BqQlRTXwXMf6lBjigjjOIpXSBds6f9qhgTvOIwWc7kA4OmauYPBWkgxNFdVmx6ktmO6ph5MrJTGmWHM2cAQ45TQeKQn1tBjtI/ilOFeKghLasFnsqNVTN+8phsdbUI1ZOFfMqeALk9B2gvYIroQDLpjZpUgZsCSwA0xIoF+9fyWPO24Yax3XkRT0AneYiy08Ckwy6/RR2M+o6uceC+4XjxlzMuV16yhuuxtQdIiE6gBh5v9wYJYp5haZHUZFd0jwJLgkjOMInytIO249X4/eLlHTUWL/iVUJ3OQt9J7EObHBCYrfH5ARXsyc/oPW7B4A/RNWgO2AAvKYlLVw0sDWpRIynbJml46B+nY59ho+wc8vn5jcAmOMFZA==",
+         "body":"{\"input\": {\"name\": \"Pizza\", \"quantity\": 6, \"restaurantId\": \"Dominos Pizza\"}}",
+         "attributes":{
+            "ApproximateReceiveCount":"1",
+            "SentTimestamp":"1676395715258",
+            "SenderId":"AROAR5S2TJZSTGYER2WGB:send-sqs-function",
+            "ApproximateFirstReceiveTimestamp":"1676395715261"
+         },
+         "messageAttributes":{
+            
+         },
+         "md5OfBody":"fe25d90fe8123ea670065bc94209c114",
+         "eventSource":"aws:sqs",
+         "eventSourceARN":"arn:aws:sqs:us-east-2:132260253285:sqs-queue",
+         "awsRegion":"us-east-2"
+      }
+   ]
+}
+```
+Next, open up the step functions workflow and see if how the workflow played out.
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/step1.png)
 
 
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/step2.png)
 
 
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/step3.png)
 
+From the workflow, we see that the payment was successful.
+
+Now, we expect to receive a `SUCCESS` email
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/email.png)
 
 
 

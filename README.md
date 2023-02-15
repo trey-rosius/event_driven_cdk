@@ -1061,6 +1061,18 @@ Now, we expect to receive a `SUCCESS` email
 
 ![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/email.png)
 
+If you keep hitting the send button in Graphbolt, you'll receive a mix of SUCCESS and FAILED emails.
+
+Be sure to also open up dynamoDB and check on the saved data.
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/dynamo.png)
+
+Before destroying or clearing up all created resources for your application. Yes, you have to destroy the application once you
+are done, in order to not rack up unneccessary AWS Bills.
+
+Test other queries like `getAllOrders` or `getSingleOrder`.
+
+
 
 
 

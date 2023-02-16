@@ -1072,8 +1072,56 @@ are done, in order to not rack up unneccessary AWS Bills.
 
 Test other queries like `getAllOrders` or `getSingleOrder`.
 
+#### getAllOrders
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/get_all_orders.png)
 
 
+#### getSingleOrder
+
+![alt text](https://raw.githubusercontent.com/trey-rosius/event_driven_cdk/master/images/get_single_order.png)
+
+
+## What Next
+
+We've barely scratched the surface, when it comes to building Event Driven Applications. I urge you to take this app 
+as a starting point, and build out something close to production grade. 
+I left a lot of room for improvement in the app. For example, in the stepfunctions workflow, you can easily take 
+out a couple of the lambda functions and create a direct service integration between step functions and dynamoDB.
+
+Step functions support >200 AWS Services.
+
+Also, in the `complete_order` and `cancel_failed_order` lambda functions, we perform a dynamodb update and then send 
+an email through sns.
+> Writing to the database and sending the email aren’t in one transactional scope.
+
+What if the email fails to send, when you've already done the dynamodb update?
+
+These are sweet edge cases you can resolve. 
+
+So instead of having lambda update dynamodb as well as send an email, you can update dynamodb directly in step functions,
+then use dynamodb streams to connect to an sns topic, through an eventbridge pipe.
+
+If you try this out, please do let me know how it goes. 
+
+## Conclusion
+
+In this tutorial series, we looked at how to create an Event Driven Application using AWS Services. 
+We built the api, using appsync, Graphql and python, then testing with GraphBolt.
+We assumed you have a basic understanding of step functions and suggested a couple of articles where you could step up
+incase you've never heard of step functions before.
+
+I really do hope you enjoyed this piece. If you did, do leave a comment or a like. 
+
+Happy Coding ✌🏾
+
+
+
+
+
+
+
+HINT: DynamoDB Streams combined with EventBridge Pipes would handle such scenarios in a better way. 
 
 
 

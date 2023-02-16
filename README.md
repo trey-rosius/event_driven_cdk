@@ -1121,14 +1121,6 @@ Happy Coding ✌🏾
 
 
 
-HINT: DynamoDB Streams combined with EventBridge Pipes would handle such scenarios in a better way. 
-
-
-
-
-
-
-
 
 
 ## References

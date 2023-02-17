@@ -41,7 +41,20 @@ This way, you’re not paying for continuous polling to check for an event.
 
 Now that we have a brief understanding of what EDA's are, let's go ahead and dive into the main topic for the blog post.
 
-We'll use the concept of EDA's to design and build a modern serverless graphql api.
+## Scope
+We'll use the concept of EDA's to design and build a modern serverless graphql api on AWS.
+We will be doing so, by mixing and matching different AWS services in a technical manner in order to accomplish the task.
+
+## Out Of Scope
+We would not be looking at introductions to any of the AWS Services used in this tutorial such as
+- AWS Step functions 
+- AWS SNS
+- AWS SQS
+But i'll provide supporting documents to upskill if need be.
+
+This tutorial is aimed at the following audiences:
+- Software engineers looking for a quick hands on intro into Event Driven Architectures
+
 
 ## Use Case
 Let's say you want to order pizza from a restaurant, through the restaurants mobile or web application. In an ideal scenario, 

@@ -16,16 +16,16 @@ from aws_cdk import (
 )
 
 from event_driven_cdk_app.post_order_resource import create_post_order_lambda_resource
-from data_sources.delete import create_data_source as create_delete_ds
-from data_sources.update import create_data_source as create_update_ds
-from data_sources.get_by_id import create_data_source as create_get_by_id_ds
-from data_sources.get_all_orders import get_all_orders_data_source
-from data_sources.send_sqs_message import create_data_source as create_sqs_send_message_ds
+from lambda_resources.create_delete_order_lambda_resource import create_delete_order_lambda_resource
+from lambda_resources.create_update_lambda_resource import create_update_lambda_resource
+from lambda_resources.create_single_order_lambda_resource import create_single_order_lambda_resource
+from lambda_resources.create_all_orders_lambda_resource import create_all_orders_lambda_resource
+from lambda_resources.send_sqs_message import create_data_source as create_sqs_send_message_ds
 from step_function_workflow.step_function import create_step_function
 
-dirname = path.dirname(__file__)
+dir_name = path.dirname(__file__)
 
-with open(os.path.join(dirname, "../schema.graphql"), 'r') as file:
+with open(os.path.join(dir_name, "../schema.graphql"), 'r') as file:
     data_schema = file.read().replace('\n', '')
 
 
@@ -43,16 +43,16 @@ class EventDrivenCdkAppStack(Stack):
                                  )
 
         sns_policy = sns.CfnTopicPolicy(self, "MyCfnTopicPolicy",
-                                                policy_document=iam.PolicyDocument(
-                                                    statements=[iam.PolicyStatement(
-                                                        actions=["sns:Publish", "sns:Subscribe"
-                                                                 ],
-                                                        principals=[iam.AnyPrincipal()],
-                                                        resources=["*"]
-                                                    )]
-                                                ),
-                                                topics=[cfn_topic.attr_topic_arn]
-                                                )
+                                        policy_document=iam.PolicyDocument(
+                                            statements=[iam.PolicyStatement(
+                                                actions=["sns:Publish", "sns:Subscribe"
+                                                         ],
+                                                principals=[iam.AnyPrincipal()],
+                                                resources=["*"]
+                                            )]
+                                        ),
+                                        topics=[cfn_topic.attr_topic_arn]
+                                        )
         cloud_watch_role_full_access = iam.ManagedPolicy.from_managed_policy_arn(self, "cloudWatchLogRole",
                                                                                  'arn:aws:iam::aws:policy'
                                                                                  '/CloudWatchLogsFullAccess')
@@ -85,18 +85,18 @@ class EventDrivenCdkAppStack(Stack):
                                              iam.ManagedPolicy.from_managed_policy_arn(self, "lambdaexecution",
                                                                                        'arn:aws:iam::aws:policy/service-role/AWSLambdaRole')])
 
-        sqs_sendMessage_role = iam.Role(self, "SQSSendMessageRole",
-                                        assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-                                        managed_policies=[
-                                            sqs_full_access_role,
-                                            cloud_watch_role_full_access])
+        sqs_send_message_role = iam.Role(self, "SQSSendMessageRole",
+                                         assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+                                         managed_policies=[
+                                             sqs_full_access_role,
+                                             cloud_watch_role_full_access])
 
-        sqs_receiveMessage_role = iam.Role(self, "SQSReceiveMessageRole",
-                                           assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
-                                           managed_policies=[
-                                               sqs_full_access_role,
-                                               cloud_watch_role_full_access,
-                                               sf_full_access_role])
+        sqs_receive_message_role = iam.Role(self, "SQSReceiveMessageRole",
+                                            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+                                            managed_policies=[
+                                                sqs_full_access_role,
+                                                cloud_watch_role_full_access,
+                                                sf_full_access_role])
 
         sns.CfnSubscription(self, "EmailSubscription",
                             topic_arn=cfn_topic.attr_topic_arn,
@@ -134,13 +134,13 @@ class EventDrivenCdkAppStack(Stack):
             queue_name="sqs-queue"
         )
 
-        deadLetterQueue = sqs.Queue(
+        dead_letter_queue = sqs.Queue(
             self, "CdkAccelerateDLQueue",
             visibility_timeout=Duration.minutes(10),
             queue_name="dead-letter-queue"
         )
 
-        sqs.DeadLetterQueue(max_receive_count=4, queue=deadLetterQueue)
+        sqs.DeadLetterQueue(max_receive_count=4, queue=dead_letter_queue)
 
         # APPSYNC
 
@@ -169,9 +169,9 @@ class EventDrivenCdkAppStack(Stack):
                                                              role_arn=lambda_execution_role.role_arn
                                                              )
 
-        create_delete_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        create_update_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        create_get_by_id_ds(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        get_all_orders_data_source(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        create_sqs_send_message_ds(self, api, schema, sqs_sendMessage_role, lambda_execution_role, queue)
-        create_post_order_lambda_resource(self, simple_state_machine, sqs_receiveMessage_role, queue)
+        create_delete_order_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        create_update_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        create_single_order_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        create_all_orders_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        create_sqs_send_message_ds(self, api, schema, sqs_send_message_role, lambda_execution_role, queue)
+        create_post_order_lambda_resource(self, simple_state_machine, sqs_receive_message_role, queue)

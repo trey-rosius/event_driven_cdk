@@ -2,13 +2,13 @@ from aws_cdk import aws_lambda as lambda_
 import aws_cdk.aws_appsync as appsync
 
 
-def create_data_source(stack, api, schema, db_role, lambda_execution_role):
+def create_single_order_lambda_resource(stack, api, schema, db_role, lambda_execution_role):
     with open("lambda_fns/get_single_order/get_single_order.py", 'r') as file:
-        getById_function = file.read()
+        get_single_order_function = file.read()
 
-    getByIdDs_function = lambda_.CfnFunction(stack, "get",
+    get_single_order_function_resource = lambda_.CfnFunction(stack, "get",
                                              code=lambda_.CfnFunction.CodeProperty(
-                                                 zip_file=getById_function
+                                                 zip_file=get_single_order_function
                                              ),
                                              role=db_role.role_arn,
 
@@ -30,20 +30,20 @@ def create_data_source(stack, api, schema, db_role, lambda_execution_role):
                                              )
                                              )
 
-    lambda_getById_order_config_property = appsync.CfnDataSource.LambdaConfigProperty(
-        lambda_function_arn=getByIdDs_function.attr_arn
+    lambda_config_property = appsync.CfnDataSource.LambdaConfigProperty(
+        lambda_function_arn=get_single_order_function_resource.attr_arn
     )
 
-    lambdaGetOrderByIdDs = appsync.CfnDataSource(scope=stack, id="lambda-get-order-ds", api_id=api.attr_api_id,
+    get_order_lambda_datasource = appsync.CfnDataSource(scope=stack, id="lambda-get-order-ds", api_id=api.attr_api_id,
                                                  name="lambda_get_order_ds", type="AWS_LAMBDA",
-                                                 lambda_config=lambda_getById_order_config_property,
+                                                 lambda_config=lambda_config_property,
                                                  service_role_arn=lambda_execution_role.role_arn)
 
     ## get order resolver
-    get_order = appsync.CfnResolver(stack, "get-order",
+    get_order_resolver = appsync.CfnResolver(stack, "get-order",
                                     api_id=api.attr_api_id,
                                     field_name="order",
                                     type_name="Query",
-                                    data_source_name=lambdaGetOrderByIdDs.name)
-    get_order.add_dependency(schema)
-    get_order.add_dependency(lambdaGetOrderByIdDs)
+                                    data_source_name=get_order_lambda_datasource.name)
+    get_order_resolver.add_dependency(schema)
+    get_order_resolver.add_dependency(get_order_lambda_datasource)

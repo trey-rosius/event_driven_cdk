@@ -2,13 +2,13 @@ from aws_cdk import aws_lambda as lambda_
 import aws_cdk.aws_appsync as appsync
 
 
-def create_data_source(stack, api, schema, db_role, lambda_execution_role):
-    with open("lambda_fns/update_order/update_order.py", 'r') as file:
-        update_function = file.read()
+def create_delete_order_lambda_resource(stack, api, schema, db_role, lambda_execution_role):
+    with open("lambda_fns/delete_order/delete_order.py", 'r') as file:
+        delete_function = file.read()
 
-    updateDs_function = lambda_.CfnFunction(stack, "update",
+    delete_order_function = lambda_.CfnFunction(stack, "delete",
                                             code=lambda_.CfnFunction.CodeProperty(
-                                                zip_file=update_function
+                                                zip_file=delete_function
                                             ),
                                             role=db_role.role_arn,
 
@@ -20,7 +20,7 @@ def create_data_source(stack, api, schema, db_role, lambda_execution_role):
                                                     "ORDER_TABLE": "ORDER"
                                                 }
                                             ),
-                                            function_name="update-order-function",
+                                            function_name="delete-order-function",
                                             handler="index.handler",
                                             package_type="Zip",
                                             runtime="python3.9",
@@ -30,19 +30,21 @@ def create_data_source(stack, api, schema, db_role, lambda_execution_role):
                                             )
                                             )
 
-    lambda_update_order_config_property = appsync.CfnDataSource.LambdaConfigProperty(
-        lambda_function_arn=updateDs_function.attr_arn
+    # Data source config property
+    lambda_delete_order_config_property = appsync.CfnDataSource.LambdaConfigProperty(
+        lambda_function_arn=delete_order_function.attr_arn
     )
 
-    lambdaUpdateOrderDs = appsync.CfnDataSource(scope=stack, id="lambda-update-order-ds", api_id=api.attr_api_id,
-                                                name="lambda_update_order_ds", type="AWS_LAMBDA",
-                                                lambda_config=lambda_update_order_config_property,
+    # Data source definition
+    delete_order_datasource = appsync.CfnDataSource(scope=stack, id="lambda-delete-order-ds", api_id=api.attr_api_id,
+                                                name="lambda_delete_order_ds", type="AWS_LAMBDA",
+                                                lambda_config=lambda_delete_order_config_property,
                                                 service_role_arn=lambda_execution_role.role_arn)
 
-    update_order = appsync.CfnResolver(stack, "update-order",
+    delete_order_resolver = appsync.CfnResolver(stack, "delete-order",
                                        api_id=api.attr_api_id,
-                                       field_name="updateOrder",
+                                       field_name="deleteOrder",
                                        type_name="Mutation",
-                                       data_source_name=lambdaUpdateOrderDs.name)
-    update_order.add_dependency(schema)
-    update_order.add_dependency(lambdaUpdateOrderDs)
+                                       data_source_name=delete_order_datasource.name)
+    delete_order_resolver.add_dependency(schema)
+    delete_order_resolver.add_dependency(delete_order_datasource)

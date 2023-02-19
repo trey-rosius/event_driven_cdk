@@ -2,13 +2,13 @@ from aws_cdk import aws_lambda as lambda_
 import aws_cdk.aws_appsync as appsync
 
 
-def get_all_orders_data_source(stack, api, schema, db_role, lambda_execution_role):
+def create_all_orders_lambda_resource(stack, api, schema, db_role, lambda_execution_role):
     with open("lambda_fns/get_orders/get_orders.py", 'r') as file:
-        geta_all_order_lambda_function = file.read()
+        get_all_order_lambda_function = file.read()
 
     get_all_order_function = lambda_.CfnFunction(stack, "gets",
                                                  code=lambda_.CfnFunction.CodeProperty(
-                                                     zip_file=geta_all_order_lambda_function
+                                                     zip_file=get_all_order_lambda_function
                                                  ),
                                                  role=db_role.role_arn,
 

@@ -1,7 +1,5 @@
 import decimal
-from datetime import datetime
 import boto3
-import uuid
 import os
 import json
 

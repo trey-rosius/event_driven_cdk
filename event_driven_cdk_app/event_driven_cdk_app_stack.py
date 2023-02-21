@@ -16,11 +16,11 @@ from aws_cdk import (
 )
 
 from event_driven_cdk_app.post_order_resource import create_post_order_lambda_resource
-from lambda_resources.create_delete_order_lambda_resource import create_delete_order_lambda_resource
-from lambda_resources.create_update_lambda_resource import create_update_lambda_resource
-from lambda_resources.create_single_order_lambda_resource import create_single_order_lambda_resource
-from lambda_resources.create_all_orders_lambda_resource import create_all_orders_lambda_resource
-from lambda_resources.send_sqs_message import create_data_source as create_sqs_send_message_ds
+from lambda_resources.delete_order_lambda_resource import delete_order_lambda_resource
+from lambda_resources.update_order_lambda_resource import update_order_lambda_resource
+from lambda_resources.get_single_order_lambda_resource import get_single_order_lambda_resource
+from lambda_resources.get_all_orders_lambda_resource import get_all_orders_lambda_resource
+from lambda_resources.send_sqs_lambda_resource import send_sqs_lambda_resource
 from step_function_workflow.step_function import create_step_function
 
 dir_name = path.dirname(__file__)
@@ -169,9 +169,9 @@ class EventDrivenCdkAppStack(Stack):
                                                              role_arn=lambda_execution_role.role_arn
                                                              )
 
-        create_delete_order_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        create_update_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        create_single_order_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        create_all_orders_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
-        create_sqs_send_message_ds(self, api, schema, sqs_send_message_role, lambda_execution_role, queue)
+        delete_order_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        update_order_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        get_single_order_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        get_all_orders_lambda_resource(self, api, schema, lambda_dynamodb_cloud_watch_role, lambda_execution_role)
+        send_sqs_lambda_resource(self, api, schema, sqs_send_message_role, lambda_execution_role, queue)
         create_post_order_lambda_resource(self, simple_state_machine, sqs_receive_message_role, queue)

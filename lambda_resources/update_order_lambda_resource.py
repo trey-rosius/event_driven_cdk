@@ -2,7 +2,7 @@ from aws_cdk import aws_lambda as lambda_
 import aws_cdk.aws_appsync as appsync
 
 
-def create_update_lambda_resource(stack, api, schema, db_role, lambda_execution_role):
+def update_order_lambda_resource(stack, api, schema, db_role, lambda_execution_role):
     with open("lambda_fns/update_order/update_order.py", 'r') as file:
         update_function = file.read()
 

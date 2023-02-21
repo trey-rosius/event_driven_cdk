@@ -2,7 +2,7 @@ from aws_cdk import aws_lambda as lambda_
 import aws_cdk.aws_appsync as appsync
 
 
-def create_delete_order_lambda_resource(stack, api, schema, db_role, lambda_execution_role):
+def delete_order_lambda_resource(stack, api, schema, db_role, lambda_execution_role):
     with open("lambda_fns/delete_order/delete_order.py", 'r') as file:
         delete_function = file.read()
 

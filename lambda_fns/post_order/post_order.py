@@ -1,8 +1,9 @@
-from datetime import datetime
-import boto3
-import os
-import json
 import decimal
+import json
+import os
+from datetime import datetime
+
+import boto3
 
 DEFAULT_ORDER_STATUS = "PENDING"
 STATE_MACHINE_ARN = os.environ.get("STATE_MACHINE_ARN")
@@ -29,9 +30,9 @@ def start_sfn_exec(sfn_input, sfn_exec_id):
     response = sfn.start_execution(
         stateMachineArn=STATE_MACHINE_ARN,
         name=sfn_exec_id,
-        input=json.dumps(sfn_input, cls=DecimalEncoder)
+        input=json.dumps(sfn_input, cls=DecimalEncoder),
     )
-    print(f'post_orders start sfn_exec_id {sfn_exec_id} and input {sfn_input}')
+    print(f"post_orders start sfn_exec_id {sfn_exec_id} and input {sfn_input}")
     return response
 
 
@@ -42,9 +43,9 @@ def handler(event, context):
         message_id = record["messageId"]
         request_body = json.loads(record["body"])
         order_data = request_body["input"]
-        print(f'post_orders reqeust_body {order_data} type: {type(order_data)}')
+        print(f"post_orders reqeust_body {order_data} type: {type(order_data)}")
         sfn_input = assemble_order(message_id, order_data)
         response = start_sfn_exec(sfn_input, message_id)
-        print(f'start sfn execution: {response}')
+        print(f"start sfn execution: {response}")
         new_order_list.append(response["executionArn"])
     return new_order_list

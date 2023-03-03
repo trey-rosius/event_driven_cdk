@@ -1,7 +1,8 @@
 import decimal
-import boto3
-import os
 import json
+import os
+
+import boto3
 
 TABLE_NAME = os.environ.get("ORDER_TABLE")
 TOPIC_ARN = os.environ.get("TOPIC_ARN")
@@ -18,18 +19,15 @@ class DecimalEncoder(json.JSONEncoder):
 
 
 def persist_order(order_item):
-    print(f'persist_order item {order_item} to table {TABLE_NAME}')
+    print(f"persist_order item {order_item} to table {TABLE_NAME}")
     response = table.put_item(Item=order_item)
     message = {"order_status": order_item["orderStatus"], "order_id": order_item["id"]}
-    print(f'new order pending payment {message}')
-    return {
-
-        "message": json.dumps(order_item, indent=4, cls=DecimalEncoder)
-    }
+    print(f"new order pending payment {message}")
+    return {"message": json.dumps(order_item, indent=4, cls=DecimalEncoder)}
 
 
 def handler(event, context):
-    print(f'event contents: {event}')
+    print(f"event contents: {event}")
     create_order_response = persist_order(event)
-    print(f'persist_order response: {create_order_response}')
+    print(f"persist_order response: {create_order_response}")
     return create_order_response

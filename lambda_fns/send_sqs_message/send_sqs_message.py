@@ -1,7 +1,8 @@
-import boto3
-import os
-import logging
 import json
+import logging
+import os
+
+import boto3
 
 logging.Logger("sqs")
 queue = boto3.client("sqs")
@@ -25,7 +26,7 @@ def send_message(message_body, message_attributes=None):
         response = queue.send_message(
             MessageBody=json.dumps(message_body),
             MessageAttributes=message_attributes,
-            QueueUrl=QueueUrl
+            QueueUrl=QueueUrl,
         )
     except Exception as error:
         print("Send message failed: %s", error)
@@ -36,10 +37,10 @@ def send_message(message_body, message_attributes=None):
 
 
 def handler(event, context):
-    message_body = event['arguments']
+    message_body = event["arguments"]
     try:
         send_message(message_body)
     except Exception:
         return None
     else:
-        return event['arguments']['input']
+        return event["arguments"]["input"]
